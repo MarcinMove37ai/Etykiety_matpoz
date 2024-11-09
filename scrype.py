@@ -17,7 +17,7 @@ temp_json_path = "temp_product_data.json"
 
 # Funkcja do wczytywania URL z pliku CSV na podstawie indeksu
 def get_url_from_csv(reference):
-    file_path = r"D:\RAG\Etykiety\url_list2.csv"
+    file_path = url_list2.csv
     with open(file_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
         for row in reader:
