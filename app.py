@@ -52,14 +52,18 @@ def initialize_session():
 
 # Funkcja do resetowania stanu sesji
 def reset_session_state():
-    st.session_state["pdf_generated"] = False
-    st.session_state["is_generating"] = False
-    st.session_state["generated_file"] = ""
-    st.session_state["file_downloaded"] = False
-    st.session_state["show_error"] = False
-    # Resetowanie pól tekstowych
-    for i in range(1, 5):
-        st.session_state[f"index{i}"] = ""
+    # Najpierw zapisujemy listę kluczy do usunięcia
+    keys_to_delete = list(st.session_state.keys())
+
+    # Usuwamy wszystkie klucze
+    for key in keys_to_delete:
+        del st.session_state[key]
+
+    # Explicite ustawiamy puste wartości dla pól tekstowych
+    st.session_state["index1"] = ""
+    st.session_state["index2"] = ""
+    st.session_state["index3"] = ""
+    st.session_state["index4"] = ""
 
 
 # Funkcja do usuwania pliku PDF
@@ -114,11 +118,13 @@ def main():
     # Sprawdzenie czy plik został pobrany i reset stanu
     if st.session_state.file_downloaded:
         reset_session_state()
+        initialize_session()
         st.rerun()
 
     # Sprawdzenie flagi resetu na początku
     if st.session_state.reset_app:
         reset_session_state()
+        initialize_session()
         st.session_state.reset_app = False
 
     # Wstawienie logo i pól do wprowadzania indeksów do paska bocznego
@@ -182,6 +188,7 @@ def main():
             st.sidebar.error("❌ Błędny indeks lub indeksy")
             if st.sidebar.button("SPRÓBUJ PONOWNIE"):
                 reset_session_state()
+                initialize_session()
                 st.rerun()
     else:
         # Po wygenerowaniu PDF pokazuje komunikat o powodzeniu
