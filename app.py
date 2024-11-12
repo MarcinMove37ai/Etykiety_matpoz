@@ -130,6 +130,10 @@ def main():
     # Wstawienie logo i pól do wprowadzania indeksów do paska bocznego
     st.sidebar.image("logo.png", use_container_width=True)
     st.sidebar.title("Generator etykiet Mat-Poż")
+    st.sidebar.markdown(
+        "<p style='text-align: right; color: #666666; font-size: 0.8em; margin-top: -15px;'>by move37th.ai</p>",
+        unsafe_allow_html=True
+    )
 
     if not st.session_state["pdf_generated"]:
         st.sidebar.divider()
