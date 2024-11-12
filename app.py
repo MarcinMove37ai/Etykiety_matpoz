@@ -1,30 +1,38 @@
 import streamlit as st
 import asyncio
-from scrype import generate_pdf_from_indices
+from scrype import generate_pdf_from_indices, get_url_from_csv
 import base64
+import os
+import uuid
+
 
 # Funkcja uruchamiająca generowanie PDF na podstawie indeksów
-def run_pdf_generation(indices):
+def run_pdf_generation(indices, file_name):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(generate_pdf_from_indices(indices))
+    result = loop.run_until_complete(generate_pdf_from_indices(indices, file_name))
     loop.close()
     return result
 
+
 # Funkcja do wyświetlania pliku PDF
 def show_pdf(file_path):
-    with open(file_path, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    pdf_display = f'''
-        <div style="display: flex; justify-content: center; align-items: center; height: 73vh;">
-            <iframe src="data:application/pdf;base64,{base64_pdf}#toolbar=0&navpanes=0&scrollbar=0"
-                    width="619"
-                    height="850"
-                    style="border: none;">
-            </iframe>
-        </div>
-    '''
-    st.markdown(pdf_display, unsafe_allow_html=True)
+    if os.path.exists(file_path):  # Sprawdzenie, czy plik istnieje
+        with open(file_path, "rb") as f:
+            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+        pdf_display = f'''
+            <div style="display: flex; justify-content: center; align-items: center; height: 73vh;">
+                <iframe src="data:application/pdf;base64,{base64_pdf}#toolbar=0&navpanes=0&scrollbar=0"
+                        width="619"
+                        height="850"
+                        style="border: none;">
+                </iframe>
+            </div>
+        '''
+        st.markdown(pdf_display, unsafe_allow_html=True)
+    else:
+        st.error("Plik PDF nie został znaleziony.")
+
 
 # Funkcja do inicjalizacji stanu sesji
 def initialize_session():
@@ -34,14 +42,56 @@ def initialize_session():
         st.session_state["is_generating"] = False
     if "reset_app" not in st.session_state:
         st.session_state.reset_app = False
+    if "generated_file" not in st.session_state:
+        st.session_state.generated_file = ""
+    if "file_downloaded" not in st.session_state:
+        st.session_state.file_downloaded = False
+    if "show_error" not in st.session_state:
+        st.session_state.show_error = False
+
 
 # Funkcja do resetowania stanu sesji
 def reset_session_state():
     st.session_state["pdf_generated"] = False
     st.session_state["is_generating"] = False
+    st.session_state["generated_file"] = ""
+    st.session_state["file_downloaded"] = False
+    st.session_state["show_error"] = False
     # Resetowanie pól tekstowych
     for i in range(1, 5):
         st.session_state[f"index{i}"] = ""
+
+
+# Funkcja do usuwania pliku PDF
+def delete_pdf_file(file_path):
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        print(f"Błąd podczas usuwania pliku: {e}")
+
+
+# Funkcja sprawdzająca czy wszystkie indeksy są niepoprawne
+def validate_indices(indices):
+    valid_indices_count = 0
+    for index in indices:
+        url, pic_url = get_url_from_csv(index)
+        if url is not None and pic_url is not None:
+            valid_indices_count += 1
+    return valid_indices_count > 0  # Zwraca True jeśli jest przynajmniej jeden poprawny indeks
+
+
+# Funkcja sprawdzająca czy generowanie PDF się powiodło
+def check_pdf_generation(file_path):
+    return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+
+
+# Funkcja obsługująca pobranie pliku
+def handle_download():
+    if st.session_state.generated_file:
+        delete_pdf_file(st.session_state.generated_file)
+    st.session_state.file_downloaded = True
+
 
 # Główna funkcja interfejsu użytkownika
 def main():
@@ -61,11 +111,15 @@ def main():
     # Inicjalizacja stanu sesji
     initialize_session()
 
+    # Sprawdzenie czy plik został pobrany i reset stanu
+    if st.session_state.file_downloaded:
+        reset_session_state()
+        st.rerun()
+
     # Sprawdzenie flagi resetu na początku
     if st.session_state.reset_app:
         reset_session_state()
         st.session_state.reset_app = False
-        st.empty()  # Czyszczenie interfejsu
 
     # Wstawienie logo i pól do wprowadzania indeksów do paska bocznego
     st.sidebar.image("logo.png", use_container_width=True)
@@ -96,11 +150,25 @@ def main():
         indices = [idx for idx in [index1, index2, index3, index4] if idx]
         if indices:
             st.session_state["is_generating"] = True
-            with message_area:
-                with st.spinner("Trwa generowanie pliku PDF..."):
-                    # Wywołaj generowanie pliku PDF
-                    run_pdf_generation(indices)
-            st.session_state["pdf_generated"] = True
+            # Sprawdzenie czy jest przynajmniej jeden poprawny indeks
+            if validate_indices(indices):
+                with message_area:
+                    with st.spinner("Trwa generowanie pliku PDF..."):
+                        # Generowanie unikalnej nazwy pliku i generowanie PDF
+                        file_name = f"products_{uuid.uuid4()}.pdf"
+                        try:
+                            run_pdf_generation(indices, file_name)
+                            if check_pdf_generation(file_name):
+                                st.session_state["generated_file"] = file_name
+                                st.session_state["pdf_generated"] = True
+                            else:
+                                st.error("❌ Wystąpił błąd podczas generowania pliku PDF.")
+                                delete_pdf_file(file_name)
+                        except Exception as e:
+                            st.error("❌ Wystąpił błąd podczas generowania pliku PDF.")
+                            delete_pdf_file(file_name)
+            else:
+                st.session_state.show_error = True
             st.session_state["is_generating"] = False
 
     # Przycisk do generowania PDF lub komunikat o powodzeniu
@@ -108,26 +176,36 @@ def main():
         # Przycisk do generowania PDF
         if st.sidebar.button("Generuj PDF", on_click=handle_generate_pdf):
             st.session_state["is_generating"] = True
+
+        # Wyświetlanie komunikatu o błędzie i przycisku "SPRÓBUJ PONOWNIE"
+        if st.session_state.show_error:
+            st.sidebar.error("❌ Błędny indeks lub indeksy")
+            if st.sidebar.button("SPRÓBUJ PONOWNIE"):
+                reset_session_state()
+                st.rerun()
     else:
         # Po wygenerowaniu PDF pokazuje komunikat o powodzeniu
         st.sidebar.success("✅ Plik został wygenerowany!")
 
         # Wyświetlenie wygenerowanego PDF
         with pdf_display_area:
-            show_pdf("products.pdf")
+            show_pdf(st.session_state["generated_file"])
 
         # Przycisk pobierania
-        with open("products.pdf", "rb") as pdf_file:
-            pdf_data = pdf_file.read()
-            if st.sidebar.download_button(
-                label="Pobierz wygenerowany PDF",
-                data=pdf_data,
-                file_name="products.pdf",
-                mime="application/pdf"
-            ):
-                # Po pobraniu, ustawiamy flagę resetu
-                st.session_state.reset_app = True
-                st.rerun()
+        try:
+            if os.path.exists(st.session_state["generated_file"]):
+                with open(st.session_state["generated_file"], "rb") as pdf_file:
+                    pdf_data = pdf_file.read()
+                    st.sidebar.download_button(
+                        label="Pobierz wygenerowany PDF",
+                        data=pdf_data,
+                        file_name=st.session_state["generated_file"],
+                        mime="application/pdf",
+                        on_click=handle_download
+                    )
+        except Exception as e:
+            st.error("Wystąpił błąd podczas generowania pliku PDF.")
+
 
 if __name__ == "__main__":
     main()

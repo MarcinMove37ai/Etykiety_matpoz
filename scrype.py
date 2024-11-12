@@ -17,13 +17,20 @@ temp_json_path = "temp_product_data.json"
 
 # Funkcja do wczytywania URL z pliku CSV na podstawie indeksu
 def get_url_from_csv(reference):
-    file_path = "url_list2.csv"
-    with open(file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile, delimiter=';')
-        for row in reader:
-            if row['reference'] == reference:
-                return row['Url'], row['Pic_url']
-    return None, None
+    file_path = r"D:\RAG\Etykiety\url_list2.csv"
+    try:
+        with open(file_path, newline='', encoding='cp1250') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=';')
+            for row in reader:
+                if row['reference'] == reference:
+                    return row['Url'], row['Pic_url']
+        return None, None
+    except UnicodeDecodeError as e:
+        print(f"Błąd odczytu pliku CSV: {e}")
+        return None, None
+    except Exception as e:
+        print(f"Nieoczekiwany błąd: {e}")
+        return None, None
 
 # Funkcja do pobierania danych o produkcie ze strony
 def fetch_product_info(url):
@@ -46,7 +53,6 @@ def fetch_product_info(url):
     except AttributeError:
         description = "Brak opisu produktu"
 
-    # Pobieranie indexu z określonego elementu
     try:
         additional_info = soup.find('div', class_='product-additional-info')
         index_span = additional_info.find('span', string=re.compile(r'Index:'))
@@ -54,7 +60,6 @@ def fetch_product_info(url):
     except AttributeError:
         index_value = "Brak indeksu"
 
-    # Pobieranie producenta
     try:
         producer_link = additional_info.find('a', href=True)
         producer_name = producer_link.text.strip()
@@ -80,7 +85,7 @@ async def summarize_description(description, temperature=0.3):
     return summary
 
 # Funkcja generująca PDF i JSON z listą indeksów
-async def generate_pdf_from_indices(indices):
+async def generate_pdf_from_indices(indices, output_pdf_path="products.pdf"):
     products_data = []
 
     for reference in indices:
@@ -104,17 +109,15 @@ async def generate_pdf_from_indices(indices):
             print(f"Indeks '{reference}' nie został znaleziony w CSV.")
 
     if products_data:
-        # Zapisz dane do JSON
         with open("temp_product_data.json", "w", encoding="utf-8") as f:
             json.dump(products_data, f, ensure_ascii=False, indent=4)
 
-        # Utwórz plik PDF na podstawie danych
-        create_pdf_with_grid(products_data)
-        return "PDF utworzony jako 'products.pdf'. Plik JSON został zapisany jako 'temp_product_data.json'."
+        # Utwórz plik PDF z unikalną nazwą
+        create_pdf_with_grid(products_data, output_file=output_pdf_path)
+        return f"PDF utworzony jako '{output_pdf_path}'. Plik JSON został zapisany jako 'temp_product_data.json'."
     else:
         return "Nie udało się znaleźć produktów dla podanych indeksów."
 
 # Uruchomienie programu
 if __name__ == "__main__":
-    # Przykład użycia dla testu
-    asyncio.run(generate_pdf_from_indices(["12345"]))  # Podaj przykładowy indeks
+    asyncio.run(generate_pdf_from_indices(["12345"]))
