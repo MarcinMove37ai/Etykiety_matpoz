@@ -65,6 +65,9 @@ def create_pdf_with_grid(data, output_file="products.pdf"):
         image_url = product["image_url"]
         product_url = product["product_url"]
 
+        # Reset pozycji Y przed każdym nowym elementem
+        pdf.set_y(y)
+
         pdf.image(logo_path, x=x, y=y, w=logo_width, h=logo_height)
         pdf.set_margins(0, 0, 0)
         pdf.set_auto_page_break(auto=False)
@@ -75,22 +78,47 @@ def create_pdf_with_grid(data, output_file="products.pdf"):
         line_y_position = y + logo_height + 2
         pdf.line(line_x_start, line_y_position, line_x_start + line_length, line_y_position)
 
+        # Generowanie QR kodu
         qr_img = generate_qr_code(product_url)
         qr_x_position = line_x_start - 2.5
         qr_y_position = line_y_position + 20
 
+        # Najpierw generujemy i umieszczamy kod QR i zdjęcie (będą "pod spodem")
+        pdf.image(qr_img, x=qr_x_position, y=qr_y_position, w=35, h=35)
+
+        if image_url:
+            response = requests.get(image_url)
+            img = Image.open(BytesIO(response.content))
+            img_ratio = img.height / img.width
+            max_width = quarter_width / 2
+            new_width = max_width
+            new_height = new_width * img_ratio
+            img_y_position = qr_y_position
+            pdf.image(image_url, x=line_x_start + line_length - 2 - new_width, y=img_y_position, w=new_width,
+                      h=new_height)
+
+        # Obliczanie wysokości tekstu nazwy produktu
+        pdf.set_font("Poppins-Bold", size=12)
         name_max_width = line_length
         name_line_height = 6
         name_text_lines = pdf.multi_cell(name_max_width, name_line_height, product_name, dry_run=True, output="LINES")
-        name_text_height = name_line_height * len(name_text_lines)
-        name_y_position = line_y_position + ((qr_y_position - line_y_position - name_text_height) / 2)
 
+        # Ograniczenie liczby linii do 3
+        if len(name_text_lines) > 3:
+            name_text_lines = name_text_lines[:3]
+            product_name = '\n'.join(name_text_lines)
+
+        name_text_height = name_line_height * len(name_text_lines)
+
+        # Obliczanie środkowej pozycji dla nazwy produktu
+        available_space = qr_y_position - line_y_position  # Przestrzeń między linią a grafikami
+        name_y_position = line_y_position + (available_space - name_text_height) / 2
+
+        # Wyświetlanie nazwy produktu (będzie "na wierzchu")
         pdf.set_font("Poppins-Bold", size=12)
         pdf.set_text_color(46, 74, 155)
-        pdf.set_xy(line_x_start, name_y_position + 0.75)
+        pdf.set_xy(line_x_start, name_y_position)
         pdf.multi_cell(name_max_width, name_line_height, product_name, align="L")
-
-        pdf.image(qr_img, x=qr_x_position, y=qr_y_position, w=35, h=35)
 
         pdf.set_font("Poppins", size=12)
         pdf.set_text_color(0, 0, 0)
@@ -106,21 +134,10 @@ def create_pdf_with_grid(data, output_file="products.pdf"):
         pdf.set_xy(line_x_start, qr_y_position + 45)
         pdf.cell(line_length, 10, f"Indeks: {product.get('index', '')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        if image_url:
-            response = requests.get(image_url)
-            img = Image.open(BytesIO(response.content))
-            img_ratio = img.height / img.width
-            max_width = quarter_width / 2
-            new_width = max_width
-            new_height = new_width * img_ratio
-            img_y_position = qr_y_position
-            pdf.image(image_url, x=line_x_start + line_length - 2 - new_width, y=img_y_position, w=new_width,
-                      h=new_height)
-
-            pdf.set_font("Poppins", size=9.6)
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_xy(line_x_start, img_y_position + new_height + 6)
-            pdf.multi_cell(line_length, 6, f"     {description}", align="J")
+        pdf.set_font("Poppins", size=9.6)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_xy(line_x_start, qr_y_position + new_height + 6)
+        pdf.multi_cell(line_length, 6, f"     {description}", align="J")
 
         if producer != "Brak producenta":
             blue_line_y_position = y + quarter_width + 30
