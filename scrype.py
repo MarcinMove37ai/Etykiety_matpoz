@@ -15,6 +15,11 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # Ścieżka do pliku tymczasowego JSON
 temp_json_path = "temp_product_data.json"
 
+# Funkcja do wczytywania URL z pliku CSV na podstawie indeksu
+import csv
+import os
+
+
 def get_url_from_csv(reference):
     # Używamy ścieżki względnej od lokalizacji skryptu
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,14 +41,6 @@ def get_url_from_csv(reference):
             continue
     return None, None
 
-# Funkcja do czyszczenia ceny
-def clean_price(price_text):
-    # Szuka wzorca: liczba,liczba zł
-    match = re.search(r'\d+,\d+\s*zł', price_text)
-    if match:
-        return match.group(0)
-    return price_text
-
 # Funkcja do pobierania danych o produkcie ze strony
 def fetch_product_info(url):
     response = requests.get(url)
@@ -56,8 +53,7 @@ def fetch_product_info(url):
         product_name = "Brak nazwy produktu"
 
     try:
-        raw_price = soup.find('div', class_='current-price').text.strip()
-        product_price = clean_price(raw_price)  # Czyszczenie ceny
+        product_price = soup.find('div', class_='current-price').text.strip()
     except AttributeError:
         product_price = "Brak ceny"
 
