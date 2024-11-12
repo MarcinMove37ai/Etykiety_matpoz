@@ -16,21 +16,30 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 temp_json_path = "temp_product_data.json"
 
 # Funkcja do wczytywania URL z pliku CSV na podstawie indeksu
+import csv
+import os
+
+
 def get_url_from_csv(reference):
-    file_path = r"D:\RAG\Etykiety\url_list2.csv"
-    try:
-        with open(file_path, newline='', encoding='cp1250') as csvfile:
-            reader = csv.DictReader(csvfile, delimiter=';')
-            for row in reader:
-                if row['reference'] == reference:
-                    return row['Url'], row['Pic_url']
-        return None, None
-    except UnicodeDecodeError as e:
-        print(f"Błąd odczytu pliku CSV: {e}")
-        return None, None
-    except Exception as e:
-        print(f"Nieoczekiwany błąd: {e}")
-        return None, None
+    # Używamy ścieżki względnej od lokalizacji skryptu
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, 'url_list2.csv')
+
+    encodings = ['cp1250', 'utf-8', 'latin1', 'iso-8859-2']
+
+    for encoding in encodings:
+        try:
+            with open(file_path, newline='', encoding=encoding) as csvfile:
+                reader = csv.DictReader(csvfile, delimiter=';')
+                for row in reader:
+                    if row['reference'] == reference:
+                        return row['Url'], row['Pic_url']
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            print(f"Błąd podczas odczytu pliku z kodowaniem {encoding}: {e}")
+            continue
+    return None, None
 
 # Funkcja do pobierania danych o produkcie ze strony
 def fetch_product_info(url):
