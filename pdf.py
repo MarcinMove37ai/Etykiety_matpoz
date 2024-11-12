@@ -95,7 +95,7 @@ def create_pdf_with_grid(data, output_file="products.pdf"):
         pdf.set_font("Poppins", size=12)
         pdf.set_text_color(0, 0, 0)
         pdf.set_xy(line_x_start, qr_y_position + 34)
-        pdf.cell(line_length, 10, "Cena:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(line_length, 10, "Cena brutto:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_xy(line_x_start, qr_y_position + 40)
         pdf.set_text_color(237, 0, 35)
         pdf.set_font("Poppins-Bold", size=18)
